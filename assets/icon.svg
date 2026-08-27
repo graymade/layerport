@@ -12,8 +12,8 @@
     <mask id="lp-ring-mask">
       <rect width="128" height="128" fill="#fff"/>
       <g clip-path="url(#lp-left)">
-        <polygon points="8,64 64,49 120,64 64,79" fill="#000" stroke="#000" stroke-width="14" stroke-linejoin="round"/>
-        <polygon points="8,64 64,49 120,64 64,79" transform="translate(0,9)" fill="#000" stroke="#000" stroke-width="14" stroke-linejoin="round"/>
+        <polygon points="8,64 64,49 120,64 64,79" fill="#000"/>
+        <polygon points="8,64 64,49 120,64 64,79" transform="translate(0,8)" fill="#000"/>
       </g>
     </mask>
     <mask id="lp-plane-mask">
