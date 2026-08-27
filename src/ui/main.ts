@@ -11,6 +11,10 @@ import { buildZip, type ZipEntry } from './zip';
 let renameMap: Record<string, string> = {};
 let batchFiles: ZipEntry[] = [];
 let batchCount = 0;
+const usedNames = new Set<string>();
+// Settings snapshot taken when Export is pressed, so changing controls while
+// a batch is composing cannot produce mixed output.
+let settings = { dpi: 72, tiff: false, tiffMode: 'rgb' as TiffMode, proofFormat: 'jpg', template: '{frame}' };
 
 const $ = (id: string) => document.getElementById(id)!;
 const checked = (id: string) => ($(id) as HTMLInputElement).checked;
@@ -33,8 +37,11 @@ function download(blob: Blob, filename: string) {
   a.click();
 }
 
-function currentDpi(): number {
-  return parseInt(selValue('dpi'), 10) || 72;
+function uniqueName(base: string): string {
+  let name = base;
+  for (let i = 2; usedNames.has(name); i++) name = base + '-' + i;
+  usedNames.add(name);
+  return name;
 }
 
 $('saveRenameMap').onclick = () => {
@@ -49,6 +56,14 @@ $('saveRenameMap').onclick = () => {
 
 $('go').onclick = () => {
   log.replaceChildren();
+  usedNames.clear();
+  settings = {
+    dpi: parseInt(selValue('dpi'), 10) || 72,
+    tiff: checked('tiffOut'),
+    tiffMode: selValue('tiffMode') as TiffMode,
+    proofFormat: selValue('proofFormat'),
+    template: ($('nameTemplate') as HTMLInputElement).value,
+  };
   parent.postMessage(
     {
       pluginMessage: {
@@ -130,7 +145,7 @@ onmessage = async (e: MessageEvent) => {
   const row = addRow('Composing ' + msg.name + '...');
   try {
     const scale: number = msg.scale || 1;
-    const dpi = currentDpi();
+    const dpi = settings.dpi;
     const spec: LayerSpec = msg.spec;
     const rootLayers = spec.kind === 'group' ? (spec as GroupSpec).layers : [spec];
     const linkedFiles: LinkedFile[] = [];
@@ -156,17 +171,19 @@ onmessage = async (e: MessageEvent) => {
     };
     if (linkedFiles.length) psd.linkedFiles = linkedFiles;
     const buf = writePsdUint8Array(psd, { generateThumbnail: true });
-    const base = exportName(msg.name, renameMap, ($('nameTemplate') as HTMLInputElement).value, {
-      frame: msg.name,
-      page: msg.page || '',
-      n: msg.index || 1,
-      width: msg.width,
-      height: msg.height,
-    });
+    const base = uniqueName(
+      exportName(msg.name, renameMap, settings.template, {
+        frame: msg.name,
+        page: msg.page || '',
+        n: msg.index || 1,
+        width: msg.width,
+        height: msg.height,
+      }),
+    );
     let proof: { data: Uint8Array; ext: string } | null = null;
-    if (msg.proofComposite) proof = await proofBytes(msg.proofComposite, selValue('proofFormat'));
+    if (msg.proofComposite) proof = await proofBytes(msg.proofComposite, settings.proofFormat);
     let tiff: Uint8Array | null = null;
-    if (checked('tiffOut')) tiff = tiffFromCanvas(compCanvas, selValue('tiffMode') as TiffMode, dpi);
+    if (settings.tiff) tiff = tiffFromCanvas(compCanvas, settings.tiffMode, dpi);
     if (batchCount > 1) {
       batchFiles.push({ name: base + '.psd', data: buf });
       if (proof) batchFiles.push({ name: base + proof.ext, data: proof.data });

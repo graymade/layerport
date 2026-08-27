@@ -28,7 +28,7 @@ export function parseRenameMap(raw: string): Record<string, string> {
       if (i > 0) {
         const id = line.slice(0, i).trim();
         const name = line.slice(i + 1).trim();
-        if (id && name) map[id] = name;
+        if (id && name && id.toLowerCase() !== 'id') map[id] = name;
       }
     }
   }

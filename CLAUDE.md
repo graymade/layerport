@@ -1,7 +1,7 @@
 # Layerport, Claude Code Instructions
 
 Open source Figma plugin (MIT) that exports frames to layered, editable PSD
-files. Public-facing project by Prisma. TypeScript, esbuild, ag-psd.
+files. Public-facing project by Sam Gray. TypeScript, esbuild, ag-psd.
 
 ## Rules
 
