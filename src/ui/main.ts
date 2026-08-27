@@ -5,6 +5,7 @@ import { writePsdUint8Array } from 'ag-psd';
 import type { GroupSpec, LayerSpec } from '../shared/spec';
 import { exportName, parseRenameMap } from './naming';
 import { canvasToImageData, decodePng, imgToCanvas, toPsdLayer, type LinkedFile } from './psd';
+import { encodeTiff, type TiffMode } from './tiff';
 import { buildZip, type ZipEntry } from './zip';
 
 let renameMap: Record<string, string> = {};
@@ -12,6 +13,8 @@ let batchFiles: ZipEntry[] = [];
 let batchCount = 0;
 
 const $ = (id: string) => document.getElementById(id)!;
+const checked = (id: string) => ($(id) as HTMLInputElement).checked;
+const selValue = (id: string) => ($(id) as HTMLSelectElement).value;
 const log = $('log');
 
 function addRow(text: string, cls?: string): HTMLDivElement {
@@ -30,6 +33,10 @@ function download(blob: Blob, filename: string) {
   a.click();
 }
 
+function currentDpi(): number {
+  return parseInt(selValue('dpi'), 10) || 72;
+}
+
 $('saveRenameMap').onclick = () => {
   try {
     const map = parseRenameMap(($('renameMapBox') as HTMLTextAreaElement).value);
@@ -46,14 +53,45 @@ $('go').onclick = () => {
     {
       pluginMessage: {
         type: 'export',
-        scale: ($('scale2') as HTMLInputElement).checked ? 2 : 1,
-        jpgScale: ($('jpgPair') as HTMLInputElement).checked ? parseInt(($('jpgScale') as HTMLSelectElement).value, 10) : 0,
-        includeHidden: ($('includeHidden') as HTMLInputElement).checked,
+        scale: checked('scale2') ? 2 : 1,
+        proofScale: checked('proofPair') ? parseInt(selValue('proofScale'), 10) : 0,
+        includeHidden: checked('includeHidden'),
+        aePreset: checked('aePreset'),
       },
     },
     '*',
   );
 };
+
+async function proofBytes(pngBytes: Uint8Array, format: string): Promise<{ data: Uint8Array; ext: string }> {
+  if (format === 'png') return { data: pngBytes, ext: '.png' };
+  const img = await decodePng(pngBytes);
+  const canvas = imgToCanvas(img, img.naturalWidth, img.naturalHeight);
+  const data = await new Promise<Uint8Array>((resolve) => {
+    canvas.toBlob(
+      (blob) => {
+        blob!.arrayBuffer().then((ab) => resolve(new Uint8Array(ab)));
+      },
+      'image/jpeg',
+      0.92,
+    );
+  });
+  return { data, ext: '.jpg' };
+}
+
+function tiffFromCanvas(canvas: HTMLCanvasElement, mode: TiffMode, dpi: number): Uint8Array {
+  // Composite over white first: print files have no alpha, and JPEG-style
+  // black fill is the wrong default for paper.
+  const flat = document.createElement('canvas');
+  flat.width = canvas.width;
+  flat.height = canvas.height;
+  const ctx = flat.getContext('2d')!;
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, flat.width, flat.height);
+  ctx.drawImage(canvas, 0, 0);
+  const rgba = ctx.getImageData(0, 0, flat.width, flat.height).data;
+  return encodeTiff(rgba, flat.width, flat.height, dpi, mode);
+}
 
 onmessage = async (e: MessageEvent) => {
   const msg = e.data.pluginMessage;
@@ -92,6 +130,7 @@ onmessage = async (e: MessageEvent) => {
   const row = addRow('Composing ' + msg.name + '...');
   try {
     const scale: number = msg.scale || 1;
+    const dpi = currentDpi();
     const spec: LayerSpec = msg.spec;
     const rootLayers = spec.kind === 'group' ? (spec as GroupSpec).layers : [spec];
     const linkedFiles: LinkedFile[] = [];
@@ -103,33 +142,41 @@ onmessage = async (e: MessageEvent) => {
       width: msg.width * scale,
       height: msg.height * scale,
       imageData: canvasToImageData(compCanvas),
+      imageResources: {
+        resolutionInfo: {
+          horizontalResolution: dpi,
+          horizontalResolutionUnit: 'PPI',
+          widthUnit: 'Inches',
+          verticalResolution: dpi,
+          verticalResolutionUnit: 'PPI',
+          heightUnit: 'Inches',
+        },
+      },
       children,
     };
     if (linkedFiles.length) psd.linkedFiles = linkedFiles;
     const buf = writePsdUint8Array(psd, { generateThumbnail: true });
-    const base = exportName(msg.name, renameMap);
-    let jpgBytes: Uint8Array | null = null;
-    if (msg.jpgComposite) {
-      const jpgImg = await decodePng(msg.jpgComposite);
-      const jpgCanvas = imgToCanvas(jpgImg, jpgImg.naturalWidth, jpgImg.naturalHeight);
-      jpgBytes = await new Promise((resolve) => {
-        jpgCanvas.toBlob(
-          (blob) => {
-            blob!.arrayBuffer().then((ab) => resolve(new Uint8Array(ab)));
-          },
-          'image/jpeg',
-          0.92,
-        );
-      });
-    }
+    const base = exportName(msg.name, renameMap, ($('nameTemplate') as HTMLInputElement).value, {
+      frame: msg.name,
+      page: msg.page || '',
+      n: msg.index || 1,
+      width: msg.width,
+      height: msg.height,
+    });
+    let proof: { data: Uint8Array; ext: string } | null = null;
+    if (msg.proofComposite) proof = await proofBytes(msg.proofComposite, selValue('proofFormat'));
+    let tiff: Uint8Array | null = null;
+    if (checked('tiffOut')) tiff = tiffFromCanvas(compCanvas, selValue('tiffMode') as TiffMode, dpi);
     if (batchCount > 1) {
       batchFiles.push({ name: base + '.psd', data: buf });
-      if (jpgBytes) batchFiles.push({ name: base + '.jpg', data: jpgBytes });
+      if (proof) batchFiles.push({ name: base + proof.ext, data: proof.data });
+      if (tiff) batchFiles.push({ name: base + '.tif', data: tiff });
     } else {
       download(new Blob([buf as BlobPart], { type: 'image/vnd.adobe.photoshop' }), base + '.psd');
-      if (jpgBytes) download(new Blob([jpgBytes as BlobPart], { type: 'image/jpeg' }), base + '.jpg');
+      if (proof) download(new Blob([proof.data as BlobPart], { type: proof.ext === '.png' ? 'image/png' : 'image/jpeg' }), base + proof.ext);
+      if (tiff) download(new Blob([tiff as BlobPart], { type: 'image/tiff' }), base + '.tif');
     }
-    row.textContent = base + ' -> PSD (' + Math.round(buf.byteLength / 1024) + ' KB, ' + linkedFiles.length + ' smart objects)';
+    row.textContent = base + ' -> PSD (' + Math.round(buf.byteLength / 1024) + ' KB, ' + linkedFiles.length + ' smart objects' + (tiff ? ', +TIFF' : '') + ')';
     row.className = 'row ok';
     (msg.warnings || []).forEach((w: string) => addRow(msg.name + ': ' + w, 'warn'));
   } catch (err: any) {

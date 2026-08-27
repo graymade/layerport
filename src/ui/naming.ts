@@ -35,8 +35,38 @@ export function parseRenameMap(raw: string): Record<string, string> {
   return map;
 }
 
-export function exportName(figmaName: string, map: Record<string, string>): string {
+function sanitize(name: string): string {
+  return name.replace(/[\\/:*?"<>|]/g, '_');
+}
+
+// Filename template. Tokens: {frame} {page} {date} {n} {width} {height}.
+// Default "{frame}" reproduces plain frame-name exports.
+export interface NameContext {
+  frame: string;
+  page: string;
+  n: number;
+  width: number;
+  height: number;
+}
+
+export function applyTemplate(template: string, ctx: NameContext): string {
+  const now = new Date();
+  const pad = (v: number) => String(v).padStart(2, '0');
+  const date = now.getFullYear() + '-' + pad(now.getMonth() + 1) + '-' + pad(now.getDate());
+  const out = (template || '{frame}')
+    .replace(/\{frame\}/g, ctx.frame)
+    .replace(/\{page\}/g, ctx.page)
+    .replace(/\{date\}/g, date)
+    .replace(/\{n\}/g, pad(ctx.n))
+    .replace(/\{width\}/g, String(ctx.width))
+    .replace(/\{height\}/g, String(ctx.height));
+  return sanitize(out);
+}
+
+// The rename map is an explicit per-frame override, so it wins over the
+// template when a tagged ID matches.
+export function exportName(figmaName: string, map: Record<string, string>, template: string, ctx: NameContext): string {
   const m = figmaName.match(/\[#(\w+)\]/);
   if (m && map[m[1]]) return map[m[1]];
-  return figmaName.replace(/[\\/:*?"<>|]/g, '_');
+  return applyTemplate(template, ctx);
 }

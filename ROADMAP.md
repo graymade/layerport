@@ -4,6 +4,17 @@ Features ordered by how much they matter to the people this plugin serves:
 designers handing layered files to retouchers, print production, packaging,
 and motion teams.
 
+## Shipped in 1.1
+
+- PNG or JPG flat proofs at 1x to 4x.
+- Flattened TIFF export, RGB or standard-conversion CMYK, with DPI tagging.
+- DPI tagging on the PSD itself (72/150/300 PPI).
+- After Effects handoff preset (plain pixel layers instead of Smart Objects,
+  since AE reads preview pixels only).
+- Naming templates with {frame} {page} {date} {n} {width} {height} tokens,
+  plus the [#ID] rename map as an explicit per-frame override.
+- Brand mark, themed UI with cards, Figma light/dark support.
+
 ## Near term (free, high value)
 
 - **Effects as layer styles.** Map Figma drop shadow, inner shadow, and
@@ -23,19 +34,15 @@ and motion teams.
 
 ## Later (candidates for a paid Pro tier)
 
-- **CMYK output and TIFF export.** The print and packaging feature. Requires
-  color conversion (likely via a bundled ICC transform) and ag-psd CMYK mode.
-- **DPI tagging** (72/150/300) on export so files open at the right physical
-  size in print workflows.
-- **After Effects handoff preset.** PSD structured for AE import: no Smart
-  Object nesting surprises, groups arranged for composition import, optional
-  1080p/4K canvas presets.
-- **Export presets.** Named bundles of settings (scale, JPG proof, hidden
-  layers, rename map) switchable per project.
-- **Naming templates.** Tokens like `{frame}`, `{page}`, `{date}`, `{#id}` for
-  batch filenames, beyond the ID map.
+- **ICC-profiled CMYK.** Today's CMYK TIFF uses the standard formula. Real
+  profile-based separation (GRACoL, FOGRA) needs a bundled ICC transform.
+- **Layered CMYK PSD.** Blocked on the PSD writer; ag-psd composes RGB only.
+- **Export presets.** Named bundles of settings (scale, proofs, TIFF, hidden
+  layers, naming) switchable per project.
 - **Linked (not embedded) Smart Objects** writing the hi-res PNGs beside the
-  PSD for smaller files and shared assets.
+  PSD. Deliberately deferred: linked files break with "missing file" alerts
+  whenever assets move, which turns into support burden. Embedded is the
+  safer default; revisit only if users ask.
 
 ## Not planned
 

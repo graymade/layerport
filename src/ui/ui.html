@@ -1,89 +1,154 @@
 <style>
   :root {
-    --lp-accent: var(--figma-color-bg-brand, #0a6cff);
-    --lp-accent-text: var(--figma-color-text-onbrand, #fff);
+    --lp-g1: #5b5bf6;
+    --lp-g2: #22d3ee;
+    --lp-grad: linear-gradient(135deg, var(--lp-g1), var(--lp-g2));
   }
+  * { box-sizing: border-box; }
   body {
     font: 12px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     margin: 0;
-    padding: 16px;
+    padding: 14px 16px 12px;
     color: var(--figma-color-text, #111);
     background: var(--figma-color-bg, #fff);
   }
-  header { display: flex; align-items: baseline; gap: 8px; margin-bottom: 4px; }
-  h1 { font-size: 15px; font-weight: 700; margin: 0; letter-spacing: -0.2px; }
-  .tag { font-size: 11px; color: var(--figma-color-text-secondary, #666); }
-  button {
-    background: var(--lp-accent);
-    color: var(--lp-accent-text);
-    border: 0; border-radius: 6px;
-    padding: 10px 16px;
-    font-size: 13px; font-weight: 600;
-    cursor: pointer; width: 100%;
+  header { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+  header svg { flex: none; border-radius: 6px; }
+  h1 { font-size: 16px; font-weight: 700; margin: 0; letter-spacing: -0.3px; }
+  .tag { font-size: 11px; color: var(--figma-color-text-secondary, #666); margin-top: 1px; }
+  .intro { color: var(--figma-color-text-secondary, #666); margin: 8px 0 12px; line-height: 1.45; }
+  .card {
+    border: 1px solid var(--figma-color-border, #e4e4e4);
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-bottom: 10px;
   }
-  button.secondary {
-    background: var(--figma-color-bg-secondary, #eee);
-    color: var(--figma-color-text, #111);
-    font-weight: 500; padding: 6px 10px; width: auto; font-size: 12px;
+  .card h2 {
+    font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px;
+    color: var(--figma-color-text-tertiary, #999);
+    margin: 0 0 6px;
   }
-  label { display: flex; gap: 6px; align-items: center; margin: 8px 0; }
-  .hint { color: var(--figma-color-text-secondary, #666); margin: 6px 0 10px; }
-  textarea {
-    width: 100%; height: 54px; box-sizing: border-box;
-    font: 10px ui-monospace, monospace;
+  label { display: flex; gap: 7px; align-items: center; margin: 7px 0; flex-wrap: wrap; }
+  label .lbl { flex: 1; min-width: 0; }
+  input[type='checkbox'] { accent-color: var(--lp-g1); margin: 0; }
+  .hint { color: var(--figma-color-text-secondary, #666); margin: 4px 0 8px; line-height: 1.4; }
+  .sub { font-size: 11px; color: var(--figma-color-text-tertiary, #999); margin: -3px 0 6px 21px; line-height: 1.35; }
+  input[type='text'], textarea, select {
     color: var(--figma-color-text, #111);
     background: var(--figma-color-bg-secondary, #fafafa);
     border: 1px solid var(--figma-color-border, #ddd);
-    border-radius: 4px;
+    border-radius: 5px;
+    font: 11px ui-monospace, monospace;
+    padding: 5px 7px;
   }
-  select {
-    color: var(--figma-color-text, #111);
+  input[type='text'] { width: 100%; }
+  textarea { width: 100%; height: 52px; font-size: 10px; }
+  select { padding: 3px 4px; }
+  button.primary {
+    background: var(--lp-grad);
+    color: #fff;
+    border: 0; border-radius: 7px;
+    padding: 11px 16px;
+    font-size: 13px; font-weight: 600;
+    cursor: pointer; width: 100%;
+    letter-spacing: 0.1px;
+  }
+  button.primary:hover { filter: brightness(1.06); }
+  button.secondary {
     background: var(--figma-color-bg-secondary, #eee);
+    color: var(--figma-color-text, #111);
     border: 1px solid var(--figma-color-border, #ddd);
-    border-radius: 4px;
+    border-radius: 5px;
+    font-weight: 500; padding: 5px 10px; width: auto; font-size: 11px; cursor: pointer;
   }
   #renameMapStatus { color: var(--figma-color-text-success, #0a7d33); font-weight: 600; }
-  #log { margin-top: 10px; max-height: 240px; overflow-y: auto; }
+  #log { margin-top: 10px; max-height: 190px; overflow-y: auto; }
   .row {
-    padding: 6px 8px; border-radius: 4px;
+    padding: 6px 8px; border-radius: 5px;
     background: var(--figma-color-bg-secondary, #f4f4f4);
     margin-bottom: 4px;
   }
   .ok { background: var(--figma-color-bg-success-tertiary, #e5f6e9); color: var(--figma-color-text, #111); }
   .err { background: var(--figma-color-bg-danger-tertiary, #fde8e8); color: var(--figma-color-text-danger, #a00); }
   .warn { background: var(--figma-color-bg-warning-tertiary, #fff6df); font-size: 11px; color: var(--figma-color-text, #111); }
-  details { margin: 6px 0 10px; }
-  summary { cursor: pointer; }
+  details { margin: 4px 0 2px; }
+  summary { cursor: pointer; font-weight: 500; }
   footer {
-    margin-top: 14px; padding-top: 8px;
+    margin-top: 12px; padding-top: 8px;
     border-top: 1px solid var(--figma-color-border, #eee);
     font-size: 10px; color: var(--figma-color-text-tertiary, #999);
+    display: flex; justify-content: space-between; gap: 8px;
   }
+  footer a { color: var(--figma-color-text-secondary, #666); text-decoration: none; font-weight: 600; white-space: nowrap; }
+  footer a:hover { text-decoration: underline; }
 </style>
 <header>
-  <h1>Layerport</h1>
-  <span class="tag">Figma to layered PSD</span>
-</header>
-<div class="hint">
-  Select frames or whole Sections, then export. Text stays live and editable,
-  image layers embed as hi-res Smart Objects (up to 3x, capped at 6000px edge).
-  Groups, blend modes, and opacity carry over. Files land in your Downloads folder.
-</div>
-<details>
-  <summary>Batch rename map (optional) <span id="renameMapStatus"></span></summary>
-  <div class="hint">
-    Frames tagged [#ID] in their name export under the filename mapped to that ID.
-    Paste JSON ({"123": "filename"}, [{"id", "filename"}] rows) or CSV lines (id,filename).
+  <svg width="26" height="26" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="lpbg" x1="0" y1="0" x2="128" y2="128" gradientUnits="userSpaceOnUse">
+        <stop offset="0" stop-color="#5B5BF6"/>
+        <stop offset="1" stop-color="#22D3EE"/>
+      </linearGradient>
+    </defs>
+    <rect width="128" height="128" rx="28" fill="url(#lpbg)"/>
+    <polygon points="64,62 102,82 64,102 26,82" fill="#fff" opacity="0.35"/>
+    <polygon points="64,46 102,66 64,86 26,66" fill="#fff" opacity="0.6"/>
+    <polygon points="64,28 102,48 64,68 26,48" fill="#fff"/>
+  </svg>
+  <div>
+    <h1>Layerport</h1>
+    <div class="tag">Figma to layered PSD</div>
   </div>
-  <textarea id="renameMapBox" placeholder='{"123": "hero_banner_wk36"}'></textarea>
-  <button class="secondary" id="saveRenameMap">Save rename map</button>
-</details>
-<label><input type="checkbox" id="includeHidden"> Include hidden layers as hidden PSD layers</label>
-<label><input type="checkbox" id="jpgPair"> Also download a matching JPG proof at
-  <select id="jpgScale"><option value="1" selected>1x</option><option value="2">2x</option><option value="3">3x</option><option value="4">4x</option></select>
-</label>
-<label><input type="checkbox" id="scale2"> Export canvas at 2x (whole PSD doubled, including text sizes)</label>
-<button id="go">Export selection to PSD</button>
+</header>
+<div class="intro">
+  Select frames or whole Sections, then export. Text stays live and editable,
+  image layers embed as hi-res Smart Objects, groups and blend modes carry over.
+  Files land in your Downloads folder.
+</div>
+
+<div class="card">
+  <h2>Output</h2>
+  <label><input type="checkbox" id="scale2"> <span class="lbl">Export canvas at 2x (whole PSD doubled, including text sizes)</span></label>
+  <label>Resolution tag
+    <select id="dpi"><option value="72" selected>72 PPI (screen)</option><option value="150">150 PPI</option><option value="300">300 PPI (print)</option></select>
+  </label>
+  <label><input type="checkbox" id="includeHidden"> <span class="lbl">Include hidden layers as hidden PSD layers</span></label>
+  <label><input type="checkbox" id="aePreset"> After Effects handoff</label>
+  <div class="sub">Skips Smart Object embedding (AE reads preview pixels only), so image layers arrive as plain pixel layers at canvas resolution. Pair with 2x for scaling headroom.</div>
+</div>
+
+<div class="card">
+  <h2>Extra files</h2>
+  <label><input type="checkbox" id="proofPair"> Flat proof
+    <select id="proofFormat"><option value="jpg" selected>JPG</option><option value="png">PNG</option></select>
+    at
+    <select id="proofScale"><option value="1" selected>1x</option><option value="2">2x</option><option value="3">3x</option><option value="4">4x</option></select>
+  </label>
+  <label><input type="checkbox" id="tiffOut"> Flattened TIFF
+    <select id="tiffMode"><option value="rgb" selected>RGB</option><option value="cmyk">CMYK (standard conversion)</option></select>
+  </label>
+  <div class="sub">TIFF carries the resolution tag above so it opens at print size. CMYK uses the standard formula, not an ICC profile; run final separations through a color-managed tool.</div>
+</div>
+
+<div class="card">
+  <h2>Naming</h2>
+  <label>Template <input type="text" id="nameTemplate" value="{frame}" spellcheck="false"></label>
+  <div class="sub">Tokens: {frame} {page} {date} {n} {width} {height}</div>
+  <details>
+    <summary>Batch rename map <span id="renameMapStatus"></span></summary>
+    <div class="hint">
+      Frames tagged [#ID] in their name export under the filename mapped to that ID,
+      overriding the template. Paste JSON ({"123": "filename"} or rows) or CSV lines (id,filename).
+    </div>
+    <textarea id="renameMapBox" placeholder='{"123": "hero_banner_wk36"}'></textarea>
+    <button class="secondary" id="saveRenameMap">Save rename map</button>
+  </details>
+</div>
+
+<button class="primary" id="go">Export selection to PSD</button>
 <div id="log"></div>
-<footer>Open source (MIT). Runs entirely in Figma, no network access. Made by Prisma.</footer>
+<footer>
+  <span>Free and open source (MIT). Runs entirely in Figma, no network access.</span>
+  <a href="https://x.com/samuelgrayart" target="_blank" rel="noopener">Made by Sam Gray</a>
+</footer>
 <!--SCRIPT-->

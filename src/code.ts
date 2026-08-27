@@ -7,11 +7,15 @@
 
 import type { ColorSpec, GroupSpec, LayerSpec, RasterSpec, TextRunSpec, TextSpec, UnitValue } from './shared/spec';
 
-figma.showUI(__html__, { width: 420, height: 640, themeColors: true });
+figma.showUI(__html__, { width: 420, height: 700, themeColors: true });
 
 let EXPORT_SCALE = 1;
-let JPG_SCALE = 0; // 0 = no JPG proof
+let PROOF_SCALE = 0; // 0 = no proof image
 let INCLUDE_HIDDEN = false;
+// After Effects handoff: AE ignores embedded Smart Object sources and works
+// from the preview pixels, so hi-res embedding is wasted bytes. Image layers
+// export at canvas resolution as plain pixel layers instead.
+let AE_PRESET = false;
 const HI_SCALE = 3;
 const MAX_EDGE = 6000;
 
@@ -132,7 +136,7 @@ async function exportRotated(node: SceneNode, base: { x: number; y: number }, wa
     [t[1][0], t[1][1], t[1][2] - rb.y],
   ];
   clone.visible = true;
-  const hi = subtreeHasImage(node);
+  const hi = !AE_PRESET && subtreeHasImage(node);
   const scale = hi ? hiScaleFor(rb.width, rb.height) : EXPORT_SCALE;
   let bytes: Uint8Array;
   try {
@@ -244,7 +248,7 @@ async function textSpec(node: TextNode, base: { x: number; y: number }, warnings
 
 async function rasterSpec(node: SceneNode, base: { x: number; y: number }): Promise<RasterSpec> {
   const pos = relPos(node, base);
-  const hi = subtreeHasImage(node);
+  const hi = !AE_PRESET && subtreeHasImage(node);
   const scale = hi ? hiScaleFor(node.width, node.height) : EXPORT_SCALE;
   const bytes = await exportPng(node, scale);
   return commonProps(node, {
@@ -264,7 +268,7 @@ async function bgRaster(node: SceneNode, base: { x: number; y: number }): Promis
       }
     }
   }
-  const hi = ownImage(node);
+  const hi = !AE_PRESET && ownImage(node);
   const scale = hi ? hiScaleFor(node.width, node.height) : EXPORT_SCALE;
   let bytes: Uint8Array | null = null;
   try {
@@ -352,14 +356,14 @@ async function run() {
     try {
       const spec = await walk(root, base, warnings);
       const composite = await exportPng(root, EXPORT_SCALE);
-      let jpgComposite: Uint8Array | null = null;
-      if (JPG_SCALE === EXPORT_SCALE) jpgComposite = composite;
-      else if (JPG_SCALE > 0) jpgComposite = await exportPng(root, JPG_SCALE);
+      let proofComposite: Uint8Array | null = null;
+      if (PROOF_SCALE === EXPORT_SCALE) proofComposite = composite;
+      else if (PROOF_SCALE > 0) proofComposite = await exportPng(root, PROOF_SCALE);
       figma.ui.postMessage({
-        type: 'piece', name: root.name,
+        type: 'piece', name: root.name, page: figma.currentPage.name, index: i + 1,
         width: Math.round(root.width), height: Math.round(root.height),
         scale: EXPORT_SCALE, spec, composite,
-        jpgComposite, warnings,
+        proofComposite, warnings,
       });
       await new Promise<void>((resolve) => {
         figma.ui.once('message', () => resolve());
@@ -375,8 +379,9 @@ figma.ui.onmessage = async (msg: any) => {
   if (!msg) return;
   if (msg.type === 'export') {
     EXPORT_SCALE = msg.scale === 2 ? 2 : 1;
-    JPG_SCALE = msg.jpgScale || 0;
+    PROOF_SCALE = msg.proofScale || 0;
     INCLUDE_HIDDEN = !!msg.includeHidden;
+    AE_PRESET = !!msg.aePreset;
     run();
   } else if (msg.type === 'saveRenameMap') {
     await figma.clientStorage.setAsync('layerportRenameMap', msg.map);

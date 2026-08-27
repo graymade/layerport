@@ -1,6 +1,6 @@
 {
   "name": "layerport",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Figma plugin that exports frames to layered, editable PSD files. Live text, hi-res Smart Objects, blend modes, batch export.",
   "private": true,
   "type": "module",
@@ -9,7 +9,7 @@
     "watch": "node build.mjs --watch",
     "typecheck": "tsc --noEmit"
   },
-  "author": "Prisma (madebyprisma.com)",
+  "author": "Sam Gray (https://x.com/samuelgrayart)",
   "license": "MIT",
   "dependencies": {
     "ag-psd": "^25.0.0"
