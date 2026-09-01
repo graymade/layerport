@@ -9,12 +9,24 @@ import { encodeTiff, type TiffMode } from './tiff';
 import { buildZip, type ZipEntry } from './zip';
 
 let renameMap: Record<string, string> = {};
-let batchFiles: ZipEntry[] = [];
+// Every file the run produces accumulates here and is delivered ONCE at the
+// end: a single file downloads directly, anything more becomes one ZIP.
+// Figma's plugin sandbox honors only the first synthetic download click per
+// burst, so firing psd + proofs + tiff as separate downloads loses files.
+let runFiles: ZipEntry[] = [];
+let runBase: string | null = null;
 let batchCount = 0;
 const usedNames = new Set<string>();
 // Settings snapshot taken when Export is pressed, so changing controls while
 // a batch is composing cannot produce mixed output.
-let settings = { dpi: 72, tiff: false, tiffMode: 'rgb' as TiffMode, proofFormat: 'jpg', template: '{frame}' };
+let settings = { dpi: 72, tiff: false, tiffMode: 'rgb' as TiffMode, jpgScale: 0, pngScale: 0, template: '{frame}' };
+
+const MIME: Record<string, string> = {
+  psd: 'image/vnd.adobe.photoshop',
+  jpg: 'image/jpeg',
+  png: 'image/png',
+  tif: 'image/tiff',
+};
 
 const $ = (id: string) => document.getElementById(id)!;
 const checked = (id: string) => ($(id) as HTMLInputElement).checked;
@@ -61,7 +73,8 @@ $('go').onclick = () => {
     dpi: parseInt(selValue('dpi'), 10) || 72,
     tiff: checked('tiffOut'),
     tiffMode: selValue('tiffMode') as TiffMode,
-    proofFormat: selValue('proofFormat'),
+    jpgScale: checked('jpgProof') ? parseInt(selValue('jpgScale'), 10) : 0,
+    pngScale: checked('pngProof') ? parseInt(selValue('pngScale'), 10) : 0,
     template: ($('nameTemplate') as HTMLInputElement).value,
   };
   parent.postMessage(
@@ -69,7 +82,8 @@ $('go').onclick = () => {
       pluginMessage: {
         type: 'export',
         scale: checked('scale2') ? 2 : 1,
-        proofScale: checked('proofPair') ? parseInt(selValue('proofScale'), 10) : 0,
+        jpgScale: settings.jpgScale,
+        pngScale: settings.pngScale,
         includeHidden: checked('includeHidden'),
         aePreset: checked('aePreset'),
       },
@@ -78,11 +92,10 @@ $('go').onclick = () => {
   );
 };
 
-async function proofBytes(pngBytes: Uint8Array, format: string): Promise<{ data: Uint8Array; ext: string }> {
-  if (format === 'png') return { data: pngBytes, ext: '.png' };
+async function toJpegBytes(pngBytes: Uint8Array): Promise<Uint8Array> {
   const img = await decodePng(pngBytes);
   const canvas = imgToCanvas(img, img.naturalWidth, img.naturalHeight);
-  const data = await new Promise<Uint8Array>((resolve) => {
+  return await new Promise<Uint8Array>((resolve) => {
     canvas.toBlob(
       (blob) => {
         blob!.arrayBuffer().then((ab) => resolve(new Uint8Array(ab)));
@@ -91,7 +104,6 @@ async function proofBytes(pngBytes: Uint8Array, format: string): Promise<{ data:
       0.92,
     );
   });
-  return { data, ext: '.jpg' };
 }
 
 function tiffFromCanvas(canvas: HTMLCanvasElement, mode: TiffMode, dpi: number): Uint8Array {
@@ -118,7 +130,8 @@ onmessage = async (e: MessageEvent) => {
   }
   if (msg.type === 'begin') {
     batchCount = msg.count;
-    batchFiles = [];
+    runFiles = [];
+    runBase = null;
     return;
   }
   if (msg.type === 'status') {
@@ -130,14 +143,20 @@ onmessage = async (e: MessageEvent) => {
     return;
   }
   if (msg.type === 'done') {
-    if (batchFiles.length > 0) {
-      const zipRow = addRow('Zipping ' + batchFiles.length + ' files...');
-      const zip = buildZip(batchFiles);
-      download(zip, 'Layerport_' + batchFiles.length + 'files_' + Math.round(zip.size / 1048576) + 'MB.zip');
-      zipRow.textContent = 'ZIP downloaded (' + batchFiles.length + ' files, one save dialog).';
+    if (runFiles.length === 1) {
+      const f = runFiles[0];
+      const ext = f.name.slice(f.name.lastIndexOf('.') + 1);
+      download(new Blob([f.data as BlobPart], { type: MIME[ext] || 'application/octet-stream' }), f.name);
+      addRow('Downloaded ' + f.name + '.', 'ok');
+    } else if (runFiles.length > 1) {
+      const zipRow = addRow('Zipping ' + runFiles.length + ' files...');
+      const zip = buildZip(runFiles);
+      const zipName = batchCount === 1 && runBase ? runBase + '.zip' : 'Layerport_' + runFiles.length + 'files_' + Math.round(zip.size / 1048576) + 'MB.zip';
+      download(zip, zipName);
+      zipRow.textContent = zipName + ' downloaded (' + runFiles.length + ' files in one ZIP; Figma allows one save per export).';
       zipRow.className = 'row ok';
-      batchFiles = [];
     }
+    runFiles = [];
     addRow('All done.', 'ok');
     return;
   }
@@ -180,20 +199,15 @@ onmessage = async (e: MessageEvent) => {
         height: msg.height,
       }),
     );
-    let proof: { data: Uint8Array; ext: string } | null = null;
-    if (msg.proofComposite) proof = await proofBytes(msg.proofComposite, settings.proofFormat);
+    if (!runBase) runBase = base;
     let tiff: Uint8Array | null = null;
     if (settings.tiff) tiff = tiffFromCanvas(compCanvas, settings.tiffMode, dpi);
-    if (batchCount > 1) {
-      batchFiles.push({ name: base + '.psd', data: buf });
-      if (proof) batchFiles.push({ name: base + proof.ext, data: proof.data });
-      if (tiff) batchFiles.push({ name: base + '.tif', data: tiff });
-    } else {
-      download(new Blob([buf as BlobPart], { type: 'image/vnd.adobe.photoshop' }), base + '.psd');
-      if (proof) download(new Blob([proof.data as BlobPart], { type: proof.ext === '.png' ? 'image/png' : 'image/jpeg' }), base + proof.ext);
-      if (tiff) download(new Blob([tiff as BlobPart], { type: 'image/tiff' }), base + '.tif');
-    }
-    row.textContent = base + ' -> PSD (' + Math.round(buf.byteLength / 1024) + ' KB, ' + linkedFiles.length + ' smart objects' + (tiff ? ', +TIFF' : '') + ')';
+    runFiles.push({ name: base + '.psd', data: buf });
+    if (msg.proofJpg) runFiles.push({ name: base + '.jpg', data: await toJpegBytes(msg.proofJpg) });
+    if (msg.proofPng) runFiles.push({ name: base + '.png', data: new Uint8Array(msg.proofPng) });
+    if (tiff) runFiles.push({ name: base + '.tif', data: tiff });
+    const extras = [msg.proofJpg && 'JPG', msg.proofPng && 'PNG', tiff && 'TIFF'].filter(Boolean).join(', ');
+    row.textContent = base + ' -> PSD (' + Math.round(buf.byteLength / 1024) + ' KB, ' + linkedFiles.length + ' smart objects' + (extras ? ', +' + extras : '') + ')';
     row.className = 'row ok';
     (msg.warnings || []).forEach((w: string) => addRow(msg.name + ': ' + w, 'warn'));
   } catch (err: any) {

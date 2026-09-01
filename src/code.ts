@@ -10,7 +10,8 @@ import type { ColorSpec, GroupSpec, LayerSpec, RasterSpec, TextRunSpec, TextSpec
 figma.showUI(__html__, { width: 420, height: 700, themeColors: true });
 
 let EXPORT_SCALE = 1;
-let PROOF_SCALE = 0; // 0 = no proof image
+let JPG_SCALE = 0; // 0 = no JPG proof
+let PNG_SCALE = 0; // 0 = no PNG proof
 let INCLUDE_HIDDEN = false;
 // After Effects handoff: AE ignores embedded Smart Object sources and works
 // from the preview pixels, so hi-res embedding is wasted bytes. Image layers
@@ -356,14 +357,20 @@ async function run() {
     try {
       const spec = await walk(root, base, warnings);
       const composite = await exportPng(root, EXPORT_SCALE);
-      let proofComposite: Uint8Array | null = null;
-      if (PROOF_SCALE === EXPORT_SCALE) proofComposite = composite;
-      else if (PROOF_SCALE > 0) proofComposite = await exportPng(root, PROOF_SCALE);
+      // Proofs are PNG bytes at the requested scale; the UI converts the JPG
+      // one. Renders are reused when scales coincide.
+      let proofJpg: Uint8Array | null = null;
+      if (JPG_SCALE === EXPORT_SCALE) proofJpg = composite;
+      else if (JPG_SCALE > 0) proofJpg = await exportPng(root, JPG_SCALE);
+      let proofPng: Uint8Array | null = null;
+      if (PNG_SCALE === EXPORT_SCALE) proofPng = composite;
+      else if (PNG_SCALE > 0 && PNG_SCALE === JPG_SCALE) proofPng = proofJpg;
+      else if (PNG_SCALE > 0) proofPng = await exportPng(root, PNG_SCALE);
       figma.ui.postMessage({
         type: 'piece', name: root.name, page: figma.currentPage.name, index: i + 1,
         width: Math.round(root.width), height: Math.round(root.height),
         scale: EXPORT_SCALE, spec, composite,
-        proofComposite, warnings,
+        proofJpg, proofPng, warnings,
       });
       await new Promise<void>((resolve) => {
         figma.ui.once('message', () => resolve());
@@ -379,7 +386,8 @@ figma.ui.onmessage = async (msg: any) => {
   if (!msg) return;
   if (msg.type === 'export') {
     EXPORT_SCALE = msg.scale === 2 ? 2 : 1;
-    PROOF_SCALE = msg.proofScale || 0;
+    JPG_SCALE = msg.jpgScale || 0;
+    PNG_SCALE = msg.pngScale || 0;
     INCLUDE_HIDDEN = !!msg.includeHidden;
     AE_PRESET = !!msg.aePreset;
     run();

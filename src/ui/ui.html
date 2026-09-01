@@ -117,7 +117,7 @@
 <div class="intro">
   Select frames or whole Sections, then export. Text stays live and editable,
   image layers embed as hi-res Smart Objects, groups and blend modes carry over.
-  Files land in your Downloads folder.
+  Files land in your Downloads folder; multiple files arrive as one ZIP.
 </div>
 
 <div class="card">
@@ -133,10 +133,11 @@
 
 <div class="card">
   <h2>Extra files</h2>
-  <label><input type="checkbox" id="proofPair"> Flat proof
-    <select id="proofFormat"><option value="jpg" selected>JPG</option><option value="png">PNG</option></select>
-    at
-    <select id="proofScale"><option value="1" selected>1x</option><option value="2">2x</option><option value="3">3x</option><option value="4">4x</option></select>
+  <label><input type="checkbox" id="jpgProof"> JPG proof at
+    <select id="jpgScale"><option value="1" selected>1x</option><option value="2">2x</option><option value="3">3x</option><option value="4">4x</option></select>
+  </label>
+  <label><input type="checkbox" id="pngProof"> PNG proof at
+    <select id="pngScale"><option value="1" selected>1x</option><option value="2">2x</option><option value="3">3x</option><option value="4">4x</option></select>
   </label>
   <label><input type="checkbox" id="tiffOut"> Flattened TIFF
     <select id="tiffMode"><option value="rgb" selected>RGB</option><option value="cmyk">CMYK (standard conversion)</option></select>
