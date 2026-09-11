@@ -16,7 +16,7 @@ Most Figma-to-PSD tools flatten everything into pixels. Layerport builds PSDs th
 
 ## Install
 
-From the Figma Community: [Layerport](https://www.figma.com/community/plugin/1680273144885123889/layerport). Submitted for review on 2026-09-11; the listing goes live once Figma approves it.
+From the Figma Community: [Layerport](https://www.figma.com/community/plugin/1680273144885123889/layerport-figma-to-photoshop-psd-export). Submitted for review on 2026-09-11; the listing goes live once Figma approves it.
 
 To run the development build:
 
