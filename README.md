@@ -70,6 +70,6 @@ See [ROADMAP.md](ROADMAP.md) for what is planned.
 
 ## License
 
-Free and open source under the [MIT license](LICENSE): use it, modify it, ship it, just keep the copyright notice.
+MIT. See [LICENSE](LICENSE).
 
 Made by [Sam Gray](https://x.com/samuelgrayart).
