@@ -7,7 +7,7 @@
 
 import type { ColorSpec, GroupSpec, LayerSpec, RasterSpec, TextRunSpec, TextSpec, UnitValue } from './shared/spec';
 
-figma.showUI(__html__, { width: 420, height: 700, themeColors: true });
+figma.showUI(__html__, { width: 420, height: 720, themeColors: false });
 
 let EXPORT_SCALE = 1;
 let JPG_SCALE = 0; // 0 = no JPG proof
