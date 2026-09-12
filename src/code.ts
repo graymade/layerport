@@ -113,6 +113,30 @@ function commonProps<T extends LayerSpec>(node: SceneNode, spec: T): T {
   return spec;
 }
 
+// Instance sublayers must not be mutated, not even visibility. Writing an
+// override makes Figma rebuild that instance's sublayer tree, and every node
+// reference the plugin still holds into it throws "node does not exist" on
+// the next read or write. Reviewer-reported on a six-level nested instance.
+// Anything that needs a temporary change is done on a detached clone.
+function inInstance(node: SceneNode): boolean {
+  return node.type === 'INSTANCE' || node.id.charAt(0) === 'I';
+}
+
+// Clone a node into a temp page-level frame at the same absolute transform,
+// detached from its component so it can be edited freely. Caller disposes.
+function stageClone(node: SceneNode): { shell: SceneNode; dispose: () => void } {
+  const tmp = figma.createFrame();
+  figma.currentPage.appendChild(tmp);
+  tmp.name = '__layerport_tmp';
+  tmp.fills = [];
+  tmp.clipsContent = false;
+  let shell: SceneNode = node.clone();
+  tmp.appendChild(shell);
+  shell.relativeTransform = node.absoluteTransform;
+  if (shell.type === 'INSTANCE') shell = shell.detachInstance();
+  return { shell, dispose: () => tmp.remove() };
+}
+
 async function exportPng(node: SceneNode, scale: number): Promise<Uint8Array> {
   return await (node as ExportMixin & SceneNode).exportAsync({ format: 'PNG', constraint: { type: 'SCALE', value: scale } });
 }
@@ -260,22 +284,36 @@ async function rasterSpec(node: SceneNode, base: { x: number; y: number }): Prom
 }
 
 async function bgRaster(node: SceneNode, base: { x: number; y: number }): Promise<RasterSpec> {
-  const hidden: SceneNode[] = [];
-  if ('children' in node) {
-    for (const c of (node as ChildrenMixin).children) {
-      if (c.visible) {
-        c.visible = false;
-        hidden.push(c);
-      }
-    }
-  }
   const hi = !AE_PRESET && ownImage(node);
   const scale = hi ? hiScaleFor(node.width, node.height) : EXPORT_SCALE;
   let bytes: Uint8Array | null = null;
-  try {
-    bytes = await exportPng(node, scale);
-  } finally {
-    for (const h of hidden) h.visible = true;
+  if (inInstance(node)) {
+    // Render the container shell from a detached clone; the source instance
+    // is never touched.
+    const staged = stageClone(node);
+    try {
+      if ('children' in staged.shell) {
+        for (const c of (staged.shell as ChildrenMixin).children) c.visible = false;
+      }
+      bytes = await exportPng(staged.shell, scale);
+    } finally {
+      staged.dispose();
+    }
+  } else {
+    const hidden: SceneNode[] = [];
+    if ('children' in node) {
+      for (const c of (node as ChildrenMixin).children) {
+        if (c.visible) {
+          c.visible = false;
+          hidden.push(c);
+        }
+      }
+    }
+    try {
+      bytes = await exportPng(node, scale);
+    } finally {
+      for (const h of hidden) h.visible = true;
+    }
   }
   const pos = relPos(node, base);
   return commonProps(node, {
@@ -288,6 +326,22 @@ async function bgRaster(node: SceneNode, base: { x: number; y: number }): Promis
 async function walk(node: SceneNode, base: { x: number; y: number }, warnings: string[]): Promise<LayerSpec | null> {
   const wasHidden = node.visible === false;
   if (wasHidden && !INCLUDE_HIDDEN) return null;
+  if (wasHidden && inInstance(node)) {
+    // Cannot flip visibility inside an instance; walk a visible detached
+    // clone at the same position instead and mark the result hidden.
+    const staged = stageClone(node);
+    try {
+      staged.shell.visible = true;
+      const spec = await walk(staged.shell, base, warnings);
+      if (spec) {
+        spec.hidden = true;
+        spec.name = node.name;
+      }
+      return spec;
+    } finally {
+      staged.dispose();
+    }
+  }
   if (wasHidden) node.visible = true;
   let spec: LayerSpec | null = null;
   try {
